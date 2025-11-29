@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  # Main defense controller
+  defense-controller:
+    build: .
+    container_name: codered-controller
+    environment:
+      - DEFENSE_MODE=patrol
+      - DEFENSE_INTENSITY=medium
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/var/log/codered
+      - ./data:/app/data
+    ports:
+      - "3000:3000"  # REST API
+      - "6789:6789"  # WebSocket
+    networks:
+      - defense-net
+    cap_add:
+      - NET_ADMIN  # Required for iptables
+      - NET_RAW    # Required for packet capture
+    restart: unless-stopped
+
+  # Honeypot network
+  honeypot-net:
+    build: .
+    container_name: codered-honeypots
+    command: python -c "
+      import asyncio;
+      import sys;
+      sys.path.append('/app');
+      from src.honeypot.honeypot_net import HoneypotNet;
+      async def main():
+        hn = HoneypotNet(100);
+        await hn.monitor();
+      asyncio.run(main())
+      "
+    volumes:
+      - ./logs:/var/log/codered
+    ports:
+      - "2222:22"    # Fake SSH
+      - "2323:23"    # Fake Telnet
+      - "8080:80"    # Fake HTTP
+      - "8443:443"   # Fake HTTPS
+      - "5902:502"   # Fake Modbus
+    networks:
+      - honeypot-net
+    restart: unless-stopped
+
+  # Swarm defender agents
+  swarm-defenders:
+    build: .
+    container_name: codered-swarm
+    command: python /app/src/swarm/quick_deploy.py --mode defense --intensity high
+    volumes:
+      - ./logs:/var/log/codered
+    networks:
+      - defense-net
+    deploy:
+      replicas: 3  # Multiple defender instances
+    restart: unless-stopped
+
+  # Vector blockchain verification
+  vector-chain:
+    build: .
+    container_name: codered-blockchain
+    command: python -c "
+      import asyncio;
+      import sys;
+      sys.path.append('/app');
+      from src.blockchain.vector_chain import VectorChain;
+      chain = VectorChain();
+      print('VectorChain running...');
+      asyncio.get_event_loop().run_forever()
+      "
+    volumes:
+      - ./blockchain-data:/app/blockchain
+    networks:
+      - defense-net
+    restart: unless-stopped
+
+  # Monitoring dashboard (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: codered-prometheus
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - defense-net
+    restart: unless-stopped
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: codered-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=codered
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    networks:
+      - defense-net
+    restart: unless-stopped
+
+networks:
+  defense-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  honeypot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  prometheus-data:
+  grafana-data:
