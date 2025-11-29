@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}} - CodeRED Defense Matrix</title>
+    <link rel="stylesheet" href="{{root}}_templates/styles.css">
+</head>
+<body>
+    <div class="navigation-bar">
+        <a href="{{root}}index.html" class="nav-home">🛡️ CodeRED Home</a>
+        <span class="nav-separator">›</span>
+        <span class="nav-current">{{section}}</span>
+    </div>
+
+    <div class="container">
+        <header class="section-header">
+            <h1>{{icon}} {{title}}</h1>
+            <p class="description">{{description}}</p>
+        </header>
+
+        <main class="content">
+            <!-- Content will be inserted here from index.md -->
+            <div id="markdown-content"></div>
+        </main>
+
+        <footer class="section-footer">
+            <div class="footer-links">
+                {{footer_links}}
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{root}}_templates/markdown-loader.js"></script>
+    <script>
+        // Load configuration from index.md
+        loadMarkdownConfig('index.md');
+    </script>
+</body>
+</html>
